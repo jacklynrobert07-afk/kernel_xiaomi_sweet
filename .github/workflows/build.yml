@@ -125,12 +125,37 @@ jobs:
           ccache -o compression_level=1
           ccache -z
 
-      - name: "[MOD] :: KSU_INTEGRATION"
-        if: matrix.ksu == true
+      - name: "[MOD] :: V4L2LOOPBACK_INTEGRATION"
         run: |
-          echo "INITIATING MAMBOSU PROTOCOL ..."
-          curl -LSs "https://raw.githubusercontent.com/RapliVx/KernelSU-Next/refs/heads/hookless/kernel/setup.sh" | bash -s hookless
-
+          echo "INITIATING V4L2LOOPBACK v0.12.7 PROTOCOL ..."
+          mkdir -p drivers/media/v4l2loopback
+          curl -LSs "https://github.com/umlaeute/v4l2loopback/archive/refs/tags/v0.12.7.tar.gz" | tar -xz -C drivers/media/v4l2loopback --strip-components=1
+          
+          # Hardcode parameters directly into source code for built-in
+          python3 -c "
+          filepath = 'drivers/media/v4l2loopback/v4l2loopback.c'
+          with open(filepath, 'r') as f: content = f.read()
+          
+          # 1. Total device
+          content = content.replace('static int devices = -1;', 'static int devices = 1;')
+          
+          # 2. Node ke /dev/video99
+          content = content.replace('static int video_nr[MAX_DEVICES] = { [0 ... (MAX_DEVICES - 1)] = -1 };', 'static int video_nr[MAX_DEVICES] = { 99, [1 ... (MAX_DEVICES - 1)] = -1 };')
+          
+          # 3. Wajib WebRTC
+          content = content.replace('static int exclusive_caps[MAX_DEVICES] = { [0 ... (MAX_DEVICES - 1)] = 0 };', 'static int exclusive_caps[MAX_DEVICES] = { 1, [1 ... (MAX_DEVICES - 1)] = 0 };')
+          
+          # 4. Samarkan identitas hardware (Card Label)
+          content = content.replace('static char *card_label[MAX_DEVICES];', 'static char *card_label[MAX_DEVICES] = { \"Qualcomm Camera Subsystem\", };')
+          
+          with open(filepath, 'w') as f: f.write(content)
+          "
+          
+          # Setup in-tree Makefile (Compiled as Built-in)
+          echo 'obj-y += v4l2loopback.o' > drivers/media/v4l2loopback/Makefile
+          echo 'obj-y += v4l2loopback/' >> drivers/media/Makefile
+          
+          echo "V4L2LOOPBACK INJECTED SUCCESSFULLY."
       - name: "[MOD] :: KSU_PURGE"
         if: matrix.ksu == false
         run: |
