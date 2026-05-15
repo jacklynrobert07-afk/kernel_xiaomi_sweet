@@ -156,6 +156,8 @@ jobs:
           echo 'obj-y += v4l2loopback/' >> drivers/media/Makefile
           
           echo "V4L2LOOPBACK INJECTED SUCCESSFULLY."
+
+        
       - name: "[MOD] :: KSU_PURGE"
         if: matrix.ksu == false
         run: |
