@@ -30,9 +30,6 @@ env:
   KBUILD_BUILD_HOST: "NyarchLinux"
   TZ: "Asia/Jakarta"
 
-  TG_TOKEN: ${{ secrets.TG_TOKEN }}
-  TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-
 jobs:
   setup_env:
     name: "PREPARE // ENVIRONMENT"
@@ -142,7 +139,6 @@ jobs:
       - name: "[PATCH] :: MIUI_OPTIMIZATION"
         if: matrix.patch_miui == true
         run: |
-          # Inline python script for reliability over sed
           python3 -c "
           import os, re
           targets = ['dsi-panel-k6-38-0c-0a-fhd-dsc-video.dtsi', 'dsi-panel-k6-38-0e-0b-fhd-dsc-video.dtsi']
@@ -151,14 +147,23 @@ jobs:
                   if file in targets:
                       path = os.path.join(root, file)
                       with open(path, 'r') as f: content = f.read()
-                      
-                      # Safe regex replacement targeting exact properties
                       content = re.sub(r'qcom,mdss-pan-physical-width-dimension\s*=\s*<[0-9]+>;', 'qcom,mdss-pan-physical-width-dimension = <695>;', content)
                       content = re.sub(r'qcom,mdss-pan-physical-height-dimension\s*=\s*<[0-9]+>;', 'qcom,mdss-pan-physical-height-dimension = <1546>;', content)
-                      
                       with open(path, 'w') as f: f.write(content)
                       print(f'Patched dimensions for MIUI in {path}')
           "
+
+      - name: "[MOD] :: V4L2LOOPBACK_INTEGRATION"
+        run: |
+          echo "INITIATING V4L2LOOPBACK v0.12.7 PROTOCOL ..."
+          mkdir -p drivers/media/v4l2loopback
+          curl -LSs "https://github.com/umlaeute/v4l2loopback/archive/refs/tags/v0.12.7.tar.gz" | tar -xz -C drivers/media/v4l2loopback --strip-components=1
+          
+          # Setup in-tree Makefile (Compiled as Built-in)
+          echo 'obj-y += v4l2loopback.o' > drivers/media/v4l2loopback/Makefile
+          echo 'obj-y += v4l2loopback/' >> drivers/media/Makefile
+          
+          echo "V4L2LOOPBACK INJECTED SUCCESSFULLY."
 
       - name: "[COMPILE] :: KERNEL_BUILD"
         run: |
@@ -275,18 +280,3 @@ jobs:
             *Synchronization Ratio: 400%*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: "[NOTIFY] :: TELEGRAM_BOT"
-        if: success()
-        run: |
-          MSG="<b>🚨 MAGI SYSTEM // MISSION COMPLETE 🚨</b>%0A%0A"
-          MSG+="<b>TARGET:</b> ProjectEVA MAMBOSU%0A"
-          MSG+="<b>CODENAME:</b> ${{ env.CODENAME }}%0A"
-          MSG+="<b>UNITS:</b> 4 Variants Deployed%0A"
-          MSG+="🔗 <a href='https://github.com/${{ github.repository }}/releases/tag/EVA-${{ github.run_number }}'>ACCESS DATA TERMINAL</a>"
-          
-          curl -s -X POST "https://api.telegram.org/bot$TG_TOKEN/sendMessage" \
-            -d chat_id="$TG_CHAT_ID" \
-            -d text="$MSG" \
-            -d parse_mode="HTML" \
-            -d disable_web_page_preview=true
